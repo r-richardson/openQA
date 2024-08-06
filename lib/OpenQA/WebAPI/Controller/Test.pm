@@ -734,6 +734,26 @@ sub _prepare_groupids ($self) {
     $v->optional('groupid')->num(0, undef);
     return $v->is_valid('groupid') ? $self->every_param('groupid') : undef;
 }
+# lib/OpenQA/WebAPI/Controller/Test.pm
+
+sub _prepare_groupids ($self) {
+    my $v = $self->validation;
+    $v->optional('groupid')->num(0, undef);
+    $v->optional('not_groupid')->num(0, undef); # Add validation for not_groupid
+
+    my $groupids = $v->is_valid('groupid') ? $self->every_param('groupid') : [];
+    my $not_groupids = $v->is_valid('not_groupid') ? $self->every_param('not_groupid') : [];
+
+    if (@$not_groupids) {
+        my %not_groupid_hash = map { $_ => 1 } @$not_groupids;
+        $groupids = [grep { !$not_groupid_hash{$_} } @$groupids];
+    }
+
+    return $groupids if @$groupids;
+    return [0] unless my $groups = $self->groups_for_globs;
+    return [map { $_->id } @$groups];
+}
+
 
 # avoid running a SELECT for each job
 sub _fetch_failed_modules_by_jobs ($self, $ids) {
