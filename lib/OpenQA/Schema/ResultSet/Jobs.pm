@@ -112,6 +112,15 @@ sub create_from_settings {
     my ($self, $settings, $scheduled_product_id) = @_;
 
     my %settings = %$settings;
+
+    foreach my $key (keys %settings) {
+        my $value = $settings{$key};
+
+        if (ref $value eq 'ARRAY' || ref $value eq 'HASH') {
+            $settings{$key} = encode_json($value);
+        }
+    }
+
     my %new_job_args = (TEST => $settings{TEST});
 
     my $result_source = $self->result_source;
@@ -132,6 +141,7 @@ sub create_from_settings {
 
     # assign group ID and priority
     my ($group_args, $group) = OpenQA::Schema::Result::Jobs::extract_group_args_from_settings(\%settings);
+
     $new_job_args{priority} = $prio if defined $prio;
     if ($group) {
         $new_job_args{group_id} = $group->id;
@@ -188,10 +198,19 @@ sub create_from_settings {
     my @job_settings;
     my $now = now;
     for my $key (keys %settings) {
-        my @values = $key eq 'WORKER_CLASS' ? split(m/,/, $settings{$key}) : ($settings{$key});
+        my $value = $settings{$key};
+
+        # Special handling for 'WORKER_CLASS' if needed
+        my @values = $key eq 'WORKER_CLASS' ? split(m/,/, $value) : ($value);
+
         push(@job_settings, {t_created => $now, t_updated => $now, key => $key, value => $_}) for (@values);
     }
     $job->settings->populate(\@job_settings);
+
+    my @test = $job->settings;
+    for my $test (@test) {
+        printf STDERR "%s: %s\n", $test->key, $test->value;
+    }
 
     # associate currently available assets with job
     $job->register_assets_from_settings;
